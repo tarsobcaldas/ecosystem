@@ -3,9 +3,10 @@
 This repository implements the simulation in C for an ecosystem with
 two types of creatures: rabbits and foxes.
 
-The world is generated in a board (default is 20x20) and runs it for at
-most the maximum numbers of generations (default is 100) or until the board
-if filled, or one of the species is extinct.
+The world is generated in a board (default is 20x20) with the set numbers
+of rabbits (defaults to 10), foxes (also defaults to 10) and rocks (defaults to 50) 
+and runs it for at most the maximum numbers of generations (default is 100)
+or until the board if filled, or one of the species is extinct.
 
 The usage of the program is as follows:
 
@@ -21,7 +22,6 @@ Usage: ecosystem [options]
     -s --silent                             
     -b --board-size <rows>x<cols>           
     -g --max-gen                            
-    -c --config <file>                      
  ```
 
 The creatures move in the following order:
@@ -42,7 +42,9 @@ reaches 0, it dies, and if they are able to eat, the food counter is reset.
 
 ## To be done:
 
-* Accept an input file properly
-* Print to an output file
-* Be able to accept a config file
-* Develop parallelism with multithreading
+[X] Accept an input file properly
+[ ] Print to an output file
+[X] Be able to accept a config file
+[ ] Fix problem with foxes trying to eat the same rabbit
+[ ] Develop parallelism with multithreading
+[ ] Implement silent and verbose levels for better testing and debbuging.

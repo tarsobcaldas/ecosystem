@@ -3,6 +3,11 @@
 
 #include <stdbool.h>
 
+#define NOTHING ' '
+
+extern bool verbose;
+extern int foxHunger, foxRepr, rabbitRepr;
+
 struct world_t;
 struct cell_t;
 
@@ -15,10 +20,11 @@ typedef struct creature_t {
   bool alive;
   char* species;
   int genCreated;
+  struct cell_t* previousPosition;
 } creature_t;
 
-creature_t* initCreature(struct world_t* world, int row, int col, char type);
-creature_t* newCreature(struct world_t* world, int row, int col, char type);
+creature_t* initCreature(struct cell_t*** board, int row, int col, char type);
+creature_t* newCreature(struct world_t* world, struct cell_t*** board, int row, int col, char type);
 
 void removeCreature(struct cell_t* cell);
 void killCreature(struct world_t* world, struct cell_t* cell);

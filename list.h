@@ -2,10 +2,14 @@
 #define LIST_H
 
 #include <stdbool.h>
+#include <stdio.h>
 
 struct creature_t;
 struct world_t;
 
+extern bool verbose;
+extern char* outputFile;
+extern FILE* output;
 
 typedef struct node_t {
   struct creature_t* creature;
@@ -18,11 +22,11 @@ typedef struct list_t {
   int size;
 } list_t;
 
-list_t* initList(struct world_t* world);
-void addtoList(struct world_t* world, struct creature_t* creature);
-void printList(struct world_t* world);
-void removefromList(struct world_t* world, struct node_t* node);
-void cleanList(struct world_t* world);
-void destroyList(struct world_t* world);
+list_t* initList();
+void addtoList(struct list_t* list, struct creature_t* creature);
+void printList(struct world_t* list);
+void removefromList(struct list_t* list, struct node_t* node);
+void cleanList(struct list_t* list);
+void destroyList(struct list_t* list);
 
 #endif
