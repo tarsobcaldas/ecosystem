@@ -45,6 +45,6 @@ reaches 0, it dies, and if they are able to eat, the food counter is reset.
 [X] Accept an input file properly
 [ ] Print to an output file
 [X] Be able to accept a config file
-[ ] Fix problem with foxes trying to eat the same rabbit
+[X] Fix problem with foxes trying to eat the same rabbit
 [ ] Develop parallelism with multithreading
 [ ] Implement silent and verbose levels for better testing and debbuging.

@@ -17,12 +17,13 @@ typedef struct node_t {
 } node_t;
 
 typedef struct list_t {
+  int size;
+  char type;
   struct node_t* first;
   struct node_t* last;
-  int size;
 } list_t;
 
-list_t* initList();
+list_t* initList(char type);
 void addtoList(struct list_t* list, struct creature_t* creature);
 void printList(struct world_t* list);
 void removefromList(struct list_t* list, struct node_t* node);
