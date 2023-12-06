@@ -5,11 +5,12 @@
 #include <stdlib.h>
 
 
-list_t* initList(void) {
+list_t* initList(char type) {
   list_t* list  = (list_t*)malloc(sizeof(list_t));
   list->first = NULL;
   list->last = NULL;
   list->size = 0;
+  list->type = type;
   return list;
 }
 

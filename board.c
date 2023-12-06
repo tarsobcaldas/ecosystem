@@ -5,19 +5,18 @@
 #include <string.h>
 #include <time.h>
 
-
 cell_t *initCell(int row, int col, char type) {
   cell_t *cell;
   cell = (cell_t *)malloc(sizeof(cell_t));
   cell->row = row;
   cell->col = col;
   cell->type = type;
-  cell->creature = (creature_t*)malloc(sizeof(creature_t));
+  cell->creature = (creature_t *)malloc(sizeof(creature_t));
   return cell;
 }
 
 cell_t ***initBoard(int rows, int cols) {
-  cell_t*** board;
+  cell_t ***board;
   board = (cell_t ***)malloc(rows * sizeof(cell_t **));
   for (int row = 0; row < rows; row++) {
     board[row] = (cell_t **)malloc(cols * sizeof(cell_t *));
@@ -28,13 +27,35 @@ cell_t ***initBoard(int rows, int cols) {
   return board;
 }
 
+void cleanCell(cell_t *cell) {
+  cell->type = NOTHING;
+  cell->creature = NULL;
+}
+
 void removeCreatures(list_t *creatureList) {
   node_t *node = creatureList->first;
   creature_t *creature;
   while (node != NULL) {
     creature = node->creature;
     if (creature->previousPosition != NULL || creature->alive == false) {
-      removeCreature(creature->previousPosition);
+      cleanCell(creature->previousPosition);
+    }
+    node = node->next;
+  }
+}
+
+void updateCreatures(cell_t ***board, list_t *creatureList) {
+  node_t *node = creatureList->first;
+  cell_t *cell;
+  creature_t *creature;
+  while (node != NULL) {
+    creature = node->creature;
+    cell = board[creature->row][creature->col];
+    if (creature->previousPosition != NULL || creature->alive == false) {
+      cleanCell(creature->previousPosition);
+    }
+    if (cell->type == 'C') {
+      cell->type = creatureList->type;
     }
     node = node->next;
   }
@@ -46,12 +67,12 @@ world_t *initWorld(world_t *world, int rows, int cols) {
   world->rows = rows;
   world->cols = cols;
   world->gen = 0;
+  world->rocks = 0;
   world->foxes = 0;
   world->rabbits = 0;
-  world->rocks = 0;
   world->creatures = 0;
-  world->rabbitsList = initList();
-  world->foxesList = initList();
+  world->rabbitsList = initList('R');
+  world->foxesList = initList('F');
   world->board = initBoard(rows, cols);
   world->nextGenBoard = initBoard(rows, cols);
   return world;
@@ -61,9 +82,9 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
   int row, col;
   cell_t *cell, *nextGenCell;
   cell_t ***board = world->board;
-  double populationStart, foxesStart, rabbitsStart, rocksStart,
-         populationEnd, foxesEnd, rabbitsEnd,  rocksEnd,
-         populationTime, foxesTime, rabbitsTime, rocksTime;
+  double populationStart, foxesStart, rabbitsStart, rocksStart, populationEnd,
+      foxesEnd, rabbitsEnd, rocksEnd, populationTime, foxesTime, rabbitsTime,
+      rocksTime;
   if (verbose) {
     printf("Populating board...\n");
     populationStart = clock();
@@ -132,7 +153,7 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
 }
 
 void printBoard(world_t *world) {
-  FILE* output = stdout;
+  FILE *output = stdout;
   if (outputFile != NULL)
     output = fopen(outputFile, "w");
   int row, col;
@@ -143,25 +164,25 @@ void printBoard(world_t *world) {
     fprintf(output, "%3d ", col);
   }
   fprintf(output, "\n\t┌");
-  for (col = 0; col < world->cols-1; col++) {
+  for (col = 0; col < world->cols - 1; col++) {
     fprintf(output, "───┬");
   }
   fprintf(output, "───┐");
   for (row = 0; row < world->rows; row++) {
     fprintf(output, "\n%d\t", row);
     for (col = 0; col < world->cols; col++) {
-      fprintf(output, "│ %c ",world->board[row][col]->type);
+      fprintf(output, "│ %c ", world->board[row][col]->type);
     }
     fprintf(output, "│");
-    if (row < world->rows-1) { 
+    if (row < world->rows - 1) {
       fprintf(output, "\n\t├");
-      for (col = 0; col < world->cols-1; col++) 
+      for (col = 0; col < world->cols - 1; col++)
         fprintf(output, "───┼");
       fprintf(output, "───┤");
     }
   }
   fprintf(output, "\n\t└");
-  for (col = 0; col < world->cols-1; col++) {
+  for (col = 0; col < world->cols - 1; col++) {
     fprintf(output, "───┴");
   }
   fprintf(output, "───┘\n\n");
@@ -178,23 +199,29 @@ void printStatus(world_t *world, FILE *output) {
 
 void move(world_t *world, cell_t *cell) {
   creature_t *creature = cell->creature;
-  if (cell->type == 'R') {
+  char *fox = "Fox";
+  char *rabbit = "Rabbit";
+  char *species = creature->species;
+  if (strcmp(species, rabbit) == 0) {
     rabbitMovement(world, creature);
-  } else if (cell->type == 'F') {
+  } else if (strcmp(species, fox) == 0) {
     foxMovement(world, creature);
   }
 }
 
 void newGeneration(world_t *world) {
   int i, currentRabbits, currentFoxes;
-  double generationStart, foxesStart, rabbitsStart,
-         generationEnd, foxesEnd, rabbitsEnd,
-         generationTime, foxesTime, rabbitsTime;
+  double generationStart, foxesStart, rabbitsStart, generationEnd, foxesEnd,
+      rabbitsEnd, generationTime, foxesTime, rabbitsTime;
   cell_t *cell;
   node_t *node;
-  creature_t* creature;
+  cell_t ***nextGenBoard = world->nextGenBoard;
+  creature_t *creature;
   list_t *rabbitsList = world->rabbitsList;
   list_t *foxesList = world->foxesList;
+  char *fox = "Fox";
+  char *rabbit = "Rabbit";
+  char *species;
   world->gen++;
   if (verbose) {
     printf("Starting generation %ld\n", world->gen);
@@ -208,11 +235,12 @@ void newGeneration(world_t *world) {
     if (node == NULL)
       break;
     creature = node->creature;
+    species = creature->species;
     cell = world->board[creature->row][creature->col];
-    if (cell->type == 'R' && creature->genCreated != world->gen) {
+    if (creature->genCreated != world->gen) {
       move(world, cell);
     }
-    node = node->next; 
+    node = node->next;
   }
   removeCreatures(rabbitsList);
   if (verbose) {
@@ -228,27 +256,29 @@ void newGeneration(world_t *world) {
     if (node == NULL)
       break;
     creature = node->creature;
+    species = creature->species;
     cell = world->board[creature->row][creature->col];
-    if (cell->type == 'F' && creature->genCreated != world->gen) {
+    if (creature->genCreated != world->gen) {
       move(world, cell);
     }
-    node = node->next; 
+    node = node->next;
   }
-  removeCreatures(foxesList);
+  updateCreatures(nextGenBoard, foxesList);
   if (verbose) {
     foxesEnd = clock();
     foxesTime = (foxesEnd - foxesStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", foxesTime);
     generationEnd = clock();
     generationTime = (generationEnd - generationStart) / CLOCKS_PER_SEC;
-    printf("Generation %ld finished in %lf seconds.\n\n", world->gen, generationTime);
+    printf("Generation %ld finished in %lf seconds.\n\n", world->gen,
+           generationTime);
   }
 
-  cell_t*** aux = world->board;
+  cell_t ***aux = world->board;
   world->board = world->nextGenBoard;
   world->nextGenBoard = aux;
 
-  if (!silent) 
+  if (!silent)
     printBoard(world);
   if (verbose)
     printList(world);
@@ -267,9 +297,10 @@ world_t *populateFromInput(world_t *world) {
   }
   if (verbose)
     printf("Reading input file...\n");
-  fscanf(input, "%d %d %d %d %d %d %d", &rabbitRepr, &foxRepr, &foxHunger, &maxGen, &rows, &cols, &nObjects);
+  fscanf(input, "%d %d %d %d %d %d %d", &rabbitRepr, &foxRepr, &foxHunger,
+         &maxGen, &rows, &cols, &nObjects);
   world = initWorld(world, rows, cols);
-  cell_t*** board = world->board;
+  cell_t ***board = world->board;
 
   int i;
   char objectType[10];
@@ -279,11 +310,11 @@ world_t *populateFromInput(world_t *world) {
     printf("Creating %d objects...\n", nObjects);
   for (i = 0; i < nObjects; i++) {
     fscanf(input, "%s %d %d", objectType, &row, &col);
-    if (verbose)
+    if (verbose && strcmp(objectType, "ROCK") == 0)
       printf("%s in position (%d,%d)\n", objectType, row, col);
     if (strcmp(objectType, "ROCK") == 0) {
-      world->board[row][col]->type =  'X';
-      world->nextGenBoard[row][col]->type =  'X';
+      world->board[row][col]->type = 'X';
+      world->nextGenBoard[row][col]->type = 'X';
       world->rocks++;
     } else if (strcmp(objectType, "RABBIT") == 0) {
       newCreature(world, board, row, col, 'R');

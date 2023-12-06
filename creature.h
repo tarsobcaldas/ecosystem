@@ -20,13 +20,14 @@ typedef struct creature_t {
   bool alive;
   char* species;
   int genCreated;
+  int reprAge;
   struct cell_t* previousPosition;
 } creature_t;
 
 creature_t* initCreature(struct cell_t*** board, int row, int col, char type);
 creature_t* newCreature(struct world_t* world, struct cell_t*** board, int row, int col, char type);
 
-void removeCreature(struct cell_t* cell);
+void removeCreature(struct creature_t* cell);
 void killCreature(struct world_t* world, struct cell_t* cell);
 void movement(struct world_t* world, creature_t* creature, char type);
 void eatCreature(struct world_t* world, creature_t* predator, char type, char target);
