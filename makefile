@@ -36,7 +36,8 @@ EXE    = ecosystem
 
 CC     = gcc
 LL     = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -fopenmp
+LFLAGS = -fopenmp
 
 # *  Define the rules.                                                       *
 

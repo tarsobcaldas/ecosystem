@@ -1,5 +1,6 @@
 #include "board.h"
 #include "creature.h"
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,18 +13,21 @@ cell_t *initCell(int row, int col, char type) {
   cell->col = col;
   cell->type = type;
   cell->creature = (creature_t *)malloc(sizeof(creature_t));
+  omp_init_lock(&cell->lock);
   return cell;
 }
 
 cell_t ***initBoard(int rows, int cols) {
   cell_t ***board;
   board = (cell_t ***)malloc(rows * sizeof(cell_t **));
+
+  #pragma omp parallel for
   for (int row = 0; row < rows; row++) {
     board[row] = (cell_t **)malloc(cols * sizeof(cell_t *));
-  }
-  for (int row = 0; row < rows; row++)
+    #pragma omp parallel for
     for (int col = 0; col < cols; col++)
       board[row][col] = initCell(row, col, NOTHING);
+  }
   return board;
 }
 
@@ -61,23 +65,6 @@ void updateCreatures(cell_t ***board, list_t *creatureList) {
   }
 }
 
-void updateCreatures(cell_t*** board, list_t* creatureList) {
-  node_t *node = creatureList->first;
-  cell_t *cell; 
-  creature_t *creature;
-  while (node != NULL) {
-    creature = node->creature;
-    cell = board[creature->row][creature->col];
-    if (creature->previousPosition != NULL || creature->alive == false) {
-      removeCreature(creature->previousPosition);
-    }
-    if (cell->type == 'C') {
-      cell->type = creatureList->type;
-    }
-    node = node->next;
-  }
-}
-
 world_t *initWorld(world_t *world, int rows, int cols) {
   world = (world_t *)malloc(sizeof(world_t));
 
@@ -104,9 +91,9 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
       rocksTime;
   if (verbose) {
     printf("Populating board...\n");
-    populationStart = clock();
+    populationStart = omp_get_wtime();
     printf("Creating %d rabbits:\n", foxes);
-    rabbitsStart = clock();
+    rabbitsStart = omp_get_wtime();
   }
   for (int i = 0; i < rabbits; i++) {
     row = rand() % world->rows;
@@ -120,11 +107,11 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
     }
   }
   if (verbose) {
-    rabbitsEnd = clock();
+    rabbitsEnd = omp_get_wtime();
     rabbitsTime = (rabbitsEnd - rabbitsStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", foxesTime);
     printf("Creating %d foxes:\n", rabbits);
-    foxesStart = clock();
+    foxesStart = omp_get_wtime();
   }
   for (int i = 0; i < foxes; i++) {
     row = rand() % world->rows;
@@ -138,11 +125,11 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
     }
   }
   if (verbose) {
-    foxesEnd = clock();
+    foxesEnd = omp_get_wtime();
     foxesTime = (foxesEnd - foxesStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", rabbitsTime);
     printf("Creating %d rocks:\n", rocks);
-    rocksStart = clock();
+    rocksStart = omp_get_wtime();
   }
   for (int i = 0; i < rocks; i++) {
     row = rand() % world->rows;
@@ -160,10 +147,10 @@ void populateBoard(world_t *world, int foxes, int rabbits, int rocks) {
     }
   }
   if (verbose) {
-    rocksEnd = clock();
+    rocksEnd = omp_get_wtime();
     rocksTime = (rocksEnd - rocksStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", rocksTime);
-    populationEnd = clock();
+    populationEnd = omp_get_wtime();
     populationTime = (populationEnd - populationStart) / CLOCKS_PER_SEC;
     printf("Board populated successfully in %f seconds!\n\n", populationTime);
   }
@@ -216,19 +203,10 @@ void printStatus(world_t *world, FILE *output) {
 
 void move(world_t *world, cell_t *cell) {
   creature_t *creature = cell->creature;
-<<<<<<< HEAD
-  char *fox = "Fox";
-  char *rabbit = "Rabbit";
   char *species = creature->species;
-=======
-  char* fox = "Fox";
-  char* rabbit = "Rabbit";
-  char* species = creature->species;
-    printf("\ncreature species: %s", species);
->>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
-  if (strcmp(species, rabbit) == 0) {
+  if (species[0] == 'R') {
     rabbitMovement(world, creature);
-  } else if (strcmp(species, fox) == 0) {
+  } else if (species[0] == 'F') {
     foxMovement(world, creature);
   }
 }
@@ -243,21 +221,12 @@ void newGeneration(world_t *world) {
   creature_t *creature;
   list_t *rabbitsList = world->rabbitsList;
   list_t *foxesList = world->foxesList;
-<<<<<<< HEAD
-  char *fox = "Fox";
-  char *rabbit = "Rabbit";
-  char *species;
-=======
-  char* fox = "Fox";
-  char* rabbit = "Rabbit";
-  char* species;
->>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
   world->gen++;
   if (verbose) {
     printf("Starting generation %ld\n", world->gen);
-    generationStart = clock();
+    generationStart = omp_get_wtime();
     printf("Moving rabbits...\n");
-    rabbitsStart = clock();
+    rabbitsStart = omp_get_wtime();
   }
   node = rabbitsList->first;
   currentRabbits = world->rabbits;
@@ -265,7 +234,6 @@ void newGeneration(world_t *world) {
     if (node == NULL)
       break;
     creature = node->creature;
-    species = creature->species;
     cell = world->board[creature->row][creature->col];
     if (creature->genCreated != world->gen) {
       move(world, cell);
@@ -274,11 +242,11 @@ void newGeneration(world_t *world) {
   }
   removeCreatures(rabbitsList);
   if (verbose) {
-    rabbitsEnd = clock();
+    rabbitsEnd = omp_get_wtime();
     rabbitsTime = (rabbitsEnd - rabbitsStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", rabbitsTime);
     printf("Moving foxes...\n");
-    foxesStart = clock();
+    foxesStart = omp_get_wtime();
   }
   node = foxesList->first;
   currentFoxes = world->foxes;
@@ -286,7 +254,6 @@ void newGeneration(world_t *world) {
     if (node == NULL)
       break;
     creature = node->creature;
-    species = creature->species;
     cell = world->board[creature->row][creature->col];
     if (creature->genCreated != world->gen) {
       move(world, cell);
@@ -295,10 +262,10 @@ void newGeneration(world_t *world) {
   }
   updateCreatures(nextGenBoard, foxesList);
   if (verbose) {
-    foxesEnd = clock();
+    foxesEnd = omp_get_wtime();
     foxesTime = (foxesEnd - foxesStart) / CLOCKS_PER_SEC;
     printf("done in %lf seconds.\n\n", foxesTime);
-    generationEnd = clock();
+    generationEnd = omp_get_wtime();
     generationTime = (generationEnd - generationStart) / CLOCKS_PER_SEC;
     printf("Generation %ld finished in %lf seconds.\n\n", world->gen,
            generationTime);
@@ -318,6 +285,7 @@ void newGeneration(world_t *world) {
     cleanList(world->foxesList);
 };
 
+
 world_t *populateFromInput(world_t *world) {
   FILE *input = fopen(inputFile, "r");
   int rows, cols;
@@ -332,13 +300,17 @@ world_t *populateFromInput(world_t *world) {
   world = initWorld(world, rows, cols);
   cell_t ***board = world->board;
 
-  int i;
-  char objectType[10];
-  int row, col;
-
   if (verbose)
     printf("Creating %d objects...\n", nObjects);
-  for (i = 0; i < nObjects; i++) {
+
+  cell_t *cell[nObjects];
+
+#pragma omp parallel for shared(world, board) if (nObjects >                   \
+                                                      LIST_PARALLEL_THRESHOLD)
+  for (int i = 0; i < nObjects; i++) {
+    char objectType[10];
+    int row, col;
+
     fscanf(input, "%s %d %d", objectType, &row, &col);
     if (verbose && strcmp(objectType, "ROCK") == 0)
       printf("%s in position (%d,%d)\n", objectType, row, col);
@@ -351,7 +323,17 @@ world_t *populateFromInput(world_t *world) {
     } else if (strcmp(objectType, "FOX") == 0) {
       newCreature(world, board, row, col, 'F');
     }
+    cell[i] = board[row][col];
   }
+
+  for (int i = 0; i < nObjects; i++) {
+    if (cell[i]->type == 'R') {
+      addtoList(world->rabbitsList, cell[i]->creature);
+    } else if (cell[i]->type == 'F') {
+      addtoList(world->foxesList, cell[i]->creature);
+    }
+  }
+
   if (verbose) {
     printf("done.\n\n");
     printf("Number of foxes: %d\n", world->foxes);
@@ -363,10 +345,12 @@ world_t *populateFromInput(world_t *world) {
   return world;
 }
 
+
 void destroyBoard(world_t *world) {
   for (int i = 0; i < world->rows; i++) {
     for (int j = 0; j < world->cols; j++) {
       free(world->board[i][j]->creature);
+      omp_destroy_lock(&world->board[i][j]->lock);
       free(world->board[i][j]);
     }
     free(world->board[i]);

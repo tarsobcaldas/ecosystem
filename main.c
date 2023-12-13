@@ -7,6 +7,7 @@
 #include "board.h"
 #include "creature.h"
 #include "list.h"
+#include <omp.h>
 
 #define ROWS 10
 #define COLS 10
@@ -56,7 +57,7 @@ struct option long_options[] = {
 
 int main(int argc, char** argv) {
   double start, end;
-  start = clock();
+  start = omp_get_wtime();
   int rows, cols, foxes, rabbits, rocks;
   world_t* world = NULL;
   FILE* output = stdout;
@@ -173,7 +174,7 @@ int main(int argc, char** argv) {
   destroyBoard(world);
   if (outputFile != NULL)
     fclose(output);
-  end = clock();
-  printf("Run lasted %lf seconds.\n", (end - start) / CLOCKS_PER_SEC);
+  end = omp_get_wtime();
+  printf("Run lasted %lf seconds.\n", (end - start));
   exit(0);
 }

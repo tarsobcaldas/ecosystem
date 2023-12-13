@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "creature.h"
 #include "list.h"
+#include "omp.h"
 
 #define NOTHING ' '
 
@@ -19,6 +20,7 @@ typedef struct cell_t {
   int row;
   int col;
   char type;
+  omp_lock_t lock;
   struct creature_t* creature;
 } cell_t;
 

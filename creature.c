@@ -1,14 +1,27 @@
 #include "creature.h"
 #include "board.h"
+#include <omp.h>
 #include <stdlib.h>
 #include <string.h>
+
+void assignID(creature_t *creature) {
+  static int maxFoxID = 0;
+  static int maxRabbitID = 0;
+  if (creature->species[0] == 'F') {
+    #pragma omp critical
+    creature->id = maxFoxID++;
+  } else if (creature->species[0] == 'R') {
+    #pragma omp critical
+    creature->id = maxRabbitID++;
+  }
+}
 
 creature_t *initCreature(cell_t ***board, int row, int col, char type) {
   creature_t *creature;
   creature = (creature_t *)malloc(sizeof(creature_t));
-  creature->id = -1;
   creature->row = row;
   creature->col = col;
+  creature->id = -1;
   creature->age = 0;
   creature->food = 0;
   creature->reprAge = 0;
@@ -27,51 +40,49 @@ creature_t *initCreature(cell_t ***board, int row, int col, char type) {
 
 creature_t *newCreature(world_t *world, cell_t ***board, int row, int col,
                         char type) {
+#pragma omp critical
   world->creatures++;
-  list_t *list;
   cell_t *cell = board[row][col];
   creature_t *creature;
-  cell->creature = initCreature(board, row, col, type);
-  creature = cell->creature;
+#pragma omp critical
+  {
+    cell->creature = initCreature(board, row, col, type);
+    creature = cell->creature;
+  }
   creature->genCreated = world->gen;
+  assignID(creature);
   if (type == 'R') {
-    list = world->rabbitsList;
+#pragma omp critical
     world->rabbits++;
   } else if (type == 'F') {
-    list = world->foxesList;
+#pragma omp critical
     world->foxes++;
   }
-  if (list->size == 0)
-    creature->id = 0;
-  else
-    creature->id = list->last->creature->id + 1;
-  addtoList(list, creature);
   if (verbose)
     printf("New %s (id%d) in position (%d,%d)\n", creature->species,
            creature->id, row, col);
   return creature;
 }
 
-void removeCreature(creature_t* creature) {
-  creature = NULL;
-}
-
 void killCreature(world_t *world, cell_t *cell) {
-  creature_t *creature = cell->creature;
+  creature_t *creature;
+#pragma omp critical
+  creature = cell->creature;
   creature->alive = false;
-  char* fox = "Fox";
-  char* rabbit = "Rabbit";
-  char* species = creature->species;
+  char *species = creature->species;
+#pragma omp critical
   world->creatures--;
-  if (strcmp(species, fox) == 0) {
+  if (species[0] == 'F') {
+#pragma omp critical
     world->foxes--;
-  } else if (strcmp(species, rabbit) == 0) {
+  } else if (species[0] == 'R') {
+#pragma omp critical
     world->rabbits--;
   }
   if (verbose)
     printf("%s %d in position (%d,%d) died :(\n", creature->species,
            creature->id, cell->creature->row, cell->creature->col);
-  removeCreature(creature);
+  creature = NULL;
 }
 
 void tryProcreation(world_t *world, cell_t *cell) {
@@ -79,36 +90,19 @@ void tryProcreation(world_t *world, cell_t *cell) {
   cell_t ***nextGenBoard = world->nextGenBoard;
   cell_t *nextGenCell = nextGenBoard[cell->row][cell->col];
   char type = cell->type;
-  char* fox = "Fox";
-  char* rabbit = "Rabbit"; 
-  char* species = creature->species;
-<<<<<<< HEAD
-  if (strcmp(species, fox) == 0 && creature->reprAge > foxRepr) {
+  char *species = creature->species;
+  if (species[0] == 'F' && creature->reprAge > foxRepr) {
     if (verbose)
       printf("%s %d had a baby! ", creature->species, creature->id);
-    newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
-                type);
+    newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col, type);
+    addtoList(world->foxesList, nextGenCell->creature);
     creature->reprAge = 0;
-  } else if (strcmp(species, rabbit) == 0 && creature->reprAge > rabbitRepr) {
+  } else if (species[0] == 'R' && creature->reprAge > rabbitRepr) {
     if (verbose)
       printf("%s %d had a baby! ", creature->species, creature->id);
-    newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
-                type);
+    newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col, type);
+    addtoList(world->rabbitsList, nextGenCell->creature);
     creature->reprAge = 0;
-=======
-  if (creature->age > 0) {
-    if (strcmp(species, fox) == 0 && creature->age % (foxRepr + 1) == 0) {
-      if (verbose)
-        printf("%s %d had a baby! ", creature->species, creature->id);
-      newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
-                  type);
-    } else if (strcmp(species, rabbit) == 0 && creature->age % (rabbitRepr + 1) == 0) {
-      if (verbose)
-        printf("%s %d had a baby! ", creature->species, creature->id);
-      newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
-                  type);
-    }
->>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
   }
 }
 
@@ -225,7 +219,6 @@ void movement(world_t *world, creature_t *creature, char type) {
   cell_t *nextCell = chooseNextCell(world, current, NOTHING);
   creature_t *nextCreature = nextCell->creature;
 
-
   if (nextCell->type == creature->species[0]) {
     int creatureReprAge, nextCreatureReprAge;
     if (creature->species[0] == 'F') {
@@ -236,20 +229,26 @@ void movement(world_t *world, creature_t *creature, char type) {
       nextCreatureReprAge = nextCreature->age % (rabbitRepr + 1);
     }
 
-    if (creatureReprAge < nextCreatureReprAge || (creatureReprAge == nextCreatureReprAge && creature->food < nextCreature->food)) {
+    if (creatureReprAge < nextCreatureReprAge ||
+        (creatureReprAge == nextCreatureReprAge &&
+         creature->food < nextCreature->food)) {
       creature_t *nextCreature = nextCell->creature;
-        if (verbose)
-          printf("%s %d (%d) crashed into %s %d (%d) in position (%d,%d) and died\n",
-                 creature->species, creature->id, creatureReprAge, nextCreature->species,
-                 nextCreature->id, nextCreatureReprAge, nextCell->row, nextCell->col);
-        tryProcreation(world,current);
-        killCreature(world, current);
-        return;
+      if (verbose)
+        printf(
+            "%s %d (%d) crashed into %s %d (%d) in position (%d,%d) and died\n",
+            creature->species, creature->id, creatureReprAge,
+            nextCreature->species, nextCreature->id, nextCreatureReprAge,
+            nextCell->row, nextCell->col);
+      tryProcreation(world, current);
+      killCreature(world, current);
+      return;
     } else {
       if (verbose)
-        printf("%s %d (%d) killed %s %d (%d) and moved from (%d,%d) to (%d,%d)\n",
-               creature->species, creature->id, creatureReprAge, nextCreature->species,
-               nextCreature->id, nextCreatureReprAge, row, col, nextCell->row, nextCell->col);
+        printf(
+            "%s %d (%d) killed %s %d (%d) and moved from (%d,%d) to (%d,%d)\n",
+            creature->species, creature->id, creatureReprAge,
+            nextCreature->species, nextCreature->id, nextCreatureReprAge, row,
+            col, nextCell->row, nextCell->col);
       killCreature(world, nextCell);
       creature->row = nextCell->row;
       creature->col = nextCell->col;
@@ -262,8 +261,8 @@ void movement(world_t *world, creature_t *creature, char type) {
 
   if (nextCell->row == row && nextCell->col == col) {
     if (verbose)
-      printf("\n%s %d stayed in (%d,%d)\n", creature->species, creature->id, row,
-             col);
+      printf("\n%s %d stayed in (%d,%d)\n", creature->species, creature->id,
+             row, col);
     nextCell->type = type;
     nextCell->creature = creature;
     return;
@@ -382,8 +381,8 @@ cell_t *chooseNextPrey(world_t *world, cell_t *cell, char type) {
 void starvation(world_t *world, creature_t *creature) {
   int row = creature->row;
   int col = creature->col;
-  char* fox = "Fox";
-  char* species = creature->species;
+  char *fox = "Fox";
+  char *species = creature->species;
   cell_t *cell = world->board[row][col];
   if (verbose)
     printf("\nStarvation! %s %d in position (%d,%d) died :(\n",
@@ -424,19 +423,25 @@ void eatCreature(world_t *world, creature_t *predator, char type, char target) {
       nextCreatureReprAge = nextCreature->age % (rabbitRepr + 1);
     }
 
-    if (predator->age < nextCreature->age || (predator->age == nextCreature->age && predator->food < nextCreature->food)) {
+    if (predator->age < nextCreature->age ||
+        (predator->age == nextCreature->age &&
+         predator->food < nextCreature->food)) {
       if (verbose)
-        printf("%s %d (%d) crashed into %s %d (%d) in position (%d,%d) and died\n",
-               predator->species, predator->id, predatorReprAge, nextCreature->species,
-               nextCreature->id, nextCreatureReprAge, nextCell->row, nextCell->col);
+        printf(
+            "%s %d (%d) crashed into %s %d (%d) in position (%d,%d) and died\n",
+            predator->species, predator->id, predatorReprAge,
+            nextCreature->species, nextCreature->id, nextCreatureReprAge,
+            nextCell->row, nextCell->col);
       tryProcreation(world, current);
       killCreature(world, current);
       return;
     } else {
       if (verbose)
-        printf("%s %d (%d) killed %s %d (%d) and moved from (%d,%d) to (%d,%d)\n",
-               predator->species, predator->id, predatorReprAge, nextCreature->species,
-               nextCreature->id, nextCreatureReprAge, row, col, nextCell->row, nextCell->col);
+        printf(
+            "%s %d (%d) killed %s %d (%d) and moved from (%d,%d) to (%d,%d)\n",
+            predator->species, predator->id, predatorReprAge,
+            nextCreature->species, nextCreature->id, nextCreatureReprAge, row,
+            col, nextCell->row, nextCell->col);
       killCreature(world, nextCell);
       predator->row = nextCell->row;
       predator->col = nextCell->col;

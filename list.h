@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <omp.h>
+
+#define LIST_PARALLEL_THRESHOLD 50
 
 struct creature_t;
 struct world_t;
@@ -19,6 +22,7 @@ typedef struct node_t {
 typedef struct list_t {
   int size;
   char type;
+  omp_lock_t lock;
   struct node_t* first;
   struct node_t* last;
 } list_t;
