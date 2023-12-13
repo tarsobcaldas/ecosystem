@@ -21,10 +21,10 @@ cell_t ***initBoard(int rows, int cols) {
   cell_t ***board;
   board = (cell_t ***)malloc(rows * sizeof(cell_t **));
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int row = 0; row < rows; row++) {
     board[row] = (cell_t **)malloc(cols * sizeof(cell_t *));
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int col = 0; col < cols; col++)
       board[row][col] = initCell(row, col, NOTHING);
   }
@@ -32,8 +32,12 @@ cell_t ***initBoard(int rows, int cols) {
 }
 
 void cleanCell(cell_t *cell) {
+  if (cell == NULL)
+    return;
   cell->type = NOTHING;
   cell->creature = NULL;
+  free(cell->creature);
+  omp_destroy_lock(&cell->creature->lock);
 }
 
 void removeCreatures(list_t *creatureList) {
@@ -203,19 +207,20 @@ void printStatus(world_t *world, FILE *output) {
 
 void move(world_t *world, cell_t *cell) {
   creature_t *creature = cell->creature;
+  if (creature == NULL)
+    return;
   char *species = creature->species;
-  if (species[0] == 'R') {
+  if (cell->type == 'R') {
     rabbitMovement(world, creature);
-  } else if (species[0] == 'F') {
+  } else if (cell->type == 'F') {
     foxMovement(world, creature);
   }
 }
 
 void newGeneration(world_t *world) {
-  int i, currentRabbits, currentFoxes;
+  int currentRabbits, currentFoxes;
   double generationStart, foxesStart, rabbitsStart, generationEnd, foxesEnd,
       rabbitsEnd, generationTime, foxesTime, rabbitsTime;
-  cell_t *cell;
   node_t *node;
   cell_t ***nextGenBoard = world->nextGenBoard;
   creature_t *creature;
@@ -230,16 +235,25 @@ void newGeneration(world_t *world) {
   }
   node = rabbitsList->first;
   currentRabbits = world->rabbits;
-  for (i = 0; i < currentRabbits; i++) {
-    if (node == NULL)
-      break;
-    creature = node->creature;
-    cell = world->board[creature->row][creature->col];
+  creature_t *rabbitstoMove[currentRabbits];
+
+  int i = 0;
+  while (node != NULL && i < currentRabbits) {
+    rabbitstoMove[i] = node->creature;
+    node = node->next;
+    i++;
+  }
+
+#pragma omp parallel for private(creature) if (currentRabbits >                \
+                                                LIST_PARALLEL_THRESHOLD)
+  for (int j = 0; j < currentRabbits; j++) {
+    creature_t *creature = rabbitstoMove[j];
+    cell_t *cell = world->board[creature->row][creature->col];
     if (creature->genCreated != world->gen) {
       move(world, cell);
     }
-    node = node->next;
   }
+
   removeCreatures(rabbitsList);
   if (verbose) {
     rabbitsEnd = omp_get_wtime();
@@ -249,17 +263,26 @@ void newGeneration(world_t *world) {
     foxesStart = omp_get_wtime();
   }
   node = foxesList->first;
-  currentFoxes = world->foxes;
-  for (i = 0; i < currentFoxes; i++) {
-    if (node == NULL)
-      break;
-    creature = node->creature;
-    cell = world->board[creature->row][creature->col];
+  currentFoxes = foxesList->size;
+  creature_t *foxestoMove[currentFoxes];
+
+  i = 0;
+  while (node != NULL && i < currentFoxes) {
+    foxestoMove[i] = node->creature;
+    node = node->next;
+    i++;
+  }
+
+#pragma omp parallel for private(creature) if (currentFoxes >                \
+                                                LIST_PARALLEL_THRESHOLD)
+  for (int j = 0; j < currentFoxes; j++) {
+    creature_t *creature = foxestoMove[j];
+    cell_t *cell = world->board[creature->row][creature->col];
     if (creature->genCreated != world->gen) {
       move(world, cell);
     }
-    node = node->next;
   }
+
   updateCreatures(nextGenBoard, foxesList);
   if (verbose) {
     foxesEnd = omp_get_wtime();
@@ -284,7 +307,6 @@ void newGeneration(world_t *world) {
   if (foxesList->size > world->foxes)
     cleanList(world->foxesList);
 };
-
 
 world_t *populateFromInput(world_t *world) {
   FILE *input = fopen(inputFile, "r");
@@ -344,7 +366,6 @@ world_t *populateFromInput(world_t *world) {
   fclose(input);
   return world;
 }
-
 
 void destroyBoard(world_t *world) {
   for (int i = 0; i < world->rows; i++) {

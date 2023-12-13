@@ -2,6 +2,7 @@
 #define CREATURE_H
 
 #include <stdbool.h>
+#include <omp.h>
 
 #define NOTHING ' '
 
@@ -18,9 +19,11 @@ typedef struct creature_t {
   int age;
   int food;
   bool alive;
+  bool moved;
   char* species;
   int genCreated;
   int reprAge;
+  omp_lock_t lock;
   struct cell_t* previousPosition;
 } creature_t;
 

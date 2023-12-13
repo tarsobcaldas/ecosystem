@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-#define LIST_PARALLEL_THRESHOLD 50
+#define LIST_PARALLEL_THRESHOLD 50 
 
 struct creature_t;
 struct world_t;
@@ -28,6 +28,7 @@ typedef struct list_t {
 } list_t;
 
 list_t* initList(char type);
+node_t* getFromList(struct list_t* list, int id);
 void addtoList(struct list_t* list, struct creature_t* creature);
 void printList(struct world_t* list);
 void removefromList(struct list_t* list, struct node_t* node);

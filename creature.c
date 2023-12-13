@@ -66,44 +66,43 @@ creature_t *newCreature(world_t *world, cell_t ***board, int row, int col,
 
 void killCreature(world_t *world, cell_t *cell) {
   creature_t *creature;
-#pragma omp critical
+  char type;
   creature = cell->creature;
   creature->alive = false;
-  char *species = creature->species;
+  type = cell->type; 
 #pragma omp critical
   world->creatures--;
-  if (species[0] == 'F') {
-#pragma omp critical
+  if (type == 'F') {
     world->foxes--;
-  } else if (species[0] == 'R') {
+  } else if (type == 'R') {
 #pragma omp critical
     world->rabbits--;
   }
   if (verbose)
     printf("%s %d in position (%d,%d) died :(\n", creature->species,
            creature->id, cell->creature->row, cell->creature->col);
-  creature = NULL;
 }
 
 void tryProcreation(world_t *world, cell_t *cell) {
+  omp_set_lock(&cell->lock);
   creature_t *creature = cell->creature;
   cell_t ***nextGenBoard = world->nextGenBoard;
   cell_t *nextGenCell = nextGenBoard[cell->row][cell->col];
   char type = cell->type;
-  char *species = creature->species;
-  if (species[0] == 'F' && creature->reprAge > foxRepr) {
+  if (type == 'F' && creature->reprAge > foxRepr) {
     if (verbose)
       printf("%s %d had a baby! ", creature->species, creature->id);
     newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col, type);
     addtoList(world->foxesList, nextGenCell->creature);
     creature->reprAge = 0;
-  } else if (species[0] == 'R' && creature->reprAge > rabbitRepr) {
+  } else if (type == 'R' && creature->reprAge > rabbitRepr) {
     if (verbose)
       printf("%s %d had a baby! ", creature->species, creature->id);
     newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col, type);
     addtoList(world->rabbitsList, nextGenCell->creature);
     creature->reprAge = 0;
   }
+  omp_unset_lock(&cell->lock);
 }
 
 cell_t *chooseNextCell(world_t *world, cell_t *cell, char type) {
@@ -123,9 +122,6 @@ cell_t *chooseNextCell(world_t *world, cell_t *cell, char type) {
   cell_t *nextGenLeft = NULL;
   cell_t *nextGenRight = NULL;
   cell_t *nextGenCurrent = nextGenBoard[row][col];
-  creature_t *creature = cell->creature;
-
-  creature->previousPosition = cell;
 
   if (row - 1 >= 0) {
     up = board[row - 1][col];
@@ -217,8 +213,10 @@ void movement(world_t *world, creature_t *creature, char type) {
   int col = creature->col;
   cell_t *current = world->board[row][col];
   cell_t *nextCell = chooseNextCell(world, current, NOTHING);
-  creature_t *nextCreature = nextCell->creature;
+  creature->previousPosition = current;
+  omp_set_lock(&nextCell->lock);
 
+  creature_t *nextCreature = nextCell->creature;
   if (nextCell->type == creature->species[0]) {
     int creatureReprAge, nextCreatureReprAge;
     if (creature->species[0] == 'F') {
@@ -241,6 +239,7 @@ void movement(world_t *world, creature_t *creature, char type) {
             nextCell->row, nextCell->col);
       tryProcreation(world, current);
       killCreature(world, current);
+      omp_unset_lock(&nextCell->lock);
       return;
     } else {
       if (verbose)
@@ -255,6 +254,7 @@ void movement(world_t *world, creature_t *creature, char type) {
       nextCell->type = type;
       nextCell->creature = creature;
       tryProcreation(world, current);
+      omp_unset_lock(&nextCell->lock);
       return;
     }
   }
@@ -265,6 +265,7 @@ void movement(world_t *world, creature_t *creature, char type) {
              row, col);
     nextCell->type = type;
     nextCell->creature = creature;
+    omp_unset_lock(&nextCell->lock);
     return;
   } else {
     if (verbose)
@@ -275,12 +276,17 @@ void movement(world_t *world, creature_t *creature, char type) {
     nextCell->type = type;
     nextCell->creature = creature;
     tryProcreation(world, current);
+    omp_unset_lock(&nextCell->lock);
   }
 }
 
 bool preyOrCorpse(cell_t *cell, char type) {
-  if (cell->type == type || cell->type == 'C')
+  omp_set_lock(&cell->lock);
+  if (cell->type == type || cell->type == 'C') {
+    omp_unset_lock(&cell->lock);
     return true;
+  }
+  omp_unset_lock(&cell->lock);
   return false;
 }
 
@@ -295,9 +301,6 @@ cell_t *chooseNextPrey(world_t *world, cell_t *cell, char type) {
   cell_t *down = NULL;
   cell_t *left = NULL;
   cell_t *right = NULL;
-  creature_t *creature = cell->creature;
-
-  creature->previousPosition = cell;
 
   if (row - 1 >= 0) {
     up = nextGenBoard[row - 1][col];
@@ -403,9 +406,12 @@ void eatCreature(world_t *world, creature_t *predator, char type, char target) {
   int col = predator->col;
   cell_t *current = world->board[row][col];
   cell_t *nextCell = chooseNextPrey(world, current, target);
+  predator->previousPosition = current;
 
+  omp_set_lock(&nextCell->lock);
   if (nextCell == current) {
     predator->food--;
+    omp_unset_lock(&nextCell->lock);
     if (predator->food == 0) {
       starvation(world, predator);
       return;
@@ -434,6 +440,7 @@ void eatCreature(world_t *world, creature_t *predator, char type, char target) {
             nextCell->row, nextCell->col);
       tryProcreation(world, current);
       killCreature(world, current);
+      omp_unset_lock(&nextCell->lock);
       return;
     } else {
       if (verbose)
@@ -449,6 +456,7 @@ void eatCreature(world_t *world, creature_t *predator, char type, char target) {
       nextCell->type = 'C';
       nextCell->creature = predator;
       tryProcreation(world, current);
+      omp_unset_lock(&nextCell->lock);
       return;
     }
   } else {
@@ -463,6 +471,7 @@ void eatCreature(world_t *world, creature_t *predator, char type, char target) {
     nextCell->type = 'C';
     nextCell->creature = predator;
     tryProcreation(world, current);
+    omp_unset_lock(&nextCell->lock);
   }
 }
 

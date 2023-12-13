@@ -50,10 +50,9 @@ void removefromList(list_t *list, node_t *node) {
     next = node->next;
     prev->next = next;
   }
-  omp_unset_lock(&list->lock);
-#pragma omp critical
   list->size--;
   free(node);
+  omp_unset_lock(&list->lock);
 }
 
 void cleanList(list_t *list) {
@@ -62,25 +61,17 @@ void cleanList(list_t *list) {
   node_t *node = list->first;
   node_t *next = NULL;
   while (node != NULL) {
-#pragma omp parallel if (list->size > LIST_PARALLEL_THRESHOLD)
-    {
-#pragma omp single
-      {
-        next = node->next;
-#pragma omp task
-        {
-          if (node->creature->alive == false) {
-            if (verbose)
-              printf("%s %d is dead, removing from list.\n",
-                     node->creature->species, node->creature->id);
-            removefromList(list, node);
-          }
-        }
-        node = next;
-      }
+    next = node->next;
+    if (node->creature->alive == false) {
+      if (verbose)
+        printf("%s %d is dead, removing from list.\n", node->creature->species,
+               node->creature->id);
+      removefromList(list, node);
+    } else {
+      node->creature->moved = false;
     }
+    node = next;
   }
-#pragma omp taskwait
   if (verbose)
     printf("List cleaned!\n\n");
 }
