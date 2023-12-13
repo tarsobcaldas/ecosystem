@@ -61,6 +61,23 @@ void updateCreatures(cell_t ***board, list_t *creatureList) {
   }
 }
 
+void updateCreatures(cell_t*** board, list_t* creatureList) {
+  node_t *node = creatureList->first;
+  cell_t *cell; 
+  creature_t *creature;
+  while (node != NULL) {
+    creature = node->creature;
+    cell = board[creature->row][creature->col];
+    if (creature->previousPosition != NULL || creature->alive == false) {
+      removeCreature(creature->previousPosition);
+    }
+    if (cell->type == 'C') {
+      cell->type = creatureList->type;
+    }
+    node = node->next;
+  }
+}
+
 world_t *initWorld(world_t *world, int rows, int cols) {
   world = (world_t *)malloc(sizeof(world_t));
 
@@ -199,9 +216,16 @@ void printStatus(world_t *world, FILE *output) {
 
 void move(world_t *world, cell_t *cell) {
   creature_t *creature = cell->creature;
+<<<<<<< HEAD
   char *fox = "Fox";
   char *rabbit = "Rabbit";
   char *species = creature->species;
+=======
+  char* fox = "Fox";
+  char* rabbit = "Rabbit";
+  char* species = creature->species;
+    printf("\ncreature species: %s", species);
+>>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
   if (strcmp(species, rabbit) == 0) {
     rabbitMovement(world, creature);
   } else if (strcmp(species, fox) == 0) {
@@ -219,9 +243,15 @@ void newGeneration(world_t *world) {
   creature_t *creature;
   list_t *rabbitsList = world->rabbitsList;
   list_t *foxesList = world->foxesList;
+<<<<<<< HEAD
   char *fox = "Fox";
   char *rabbit = "Rabbit";
   char *species;
+=======
+  char* fox = "Fox";
+  char* rabbit = "Rabbit";
+  char* species;
+>>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
   world->gen++;
   if (verbose) {
     printf("Starting generation %ld\n", world->gen);

@@ -82,6 +82,7 @@ void tryProcreation(world_t *world, cell_t *cell) {
   char* fox = "Fox";
   char* rabbit = "Rabbit"; 
   char* species = creature->species;
+<<<<<<< HEAD
   if (strcmp(species, fox) == 0 && creature->reprAge > foxRepr) {
     if (verbose)
       printf("%s %d had a baby! ", creature->species, creature->id);
@@ -94,6 +95,20 @@ void tryProcreation(world_t *world, cell_t *cell) {
     newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
                 type);
     creature->reprAge = 0;
+=======
+  if (creature->age > 0) {
+    if (strcmp(species, fox) == 0 && creature->age % (foxRepr + 1) == 0) {
+      if (verbose)
+        printf("%s %d had a baby! ", creature->species, creature->id);
+      newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
+                  type);
+    } else if (strcmp(species, rabbit) == 0 && creature->age % (rabbitRepr + 1) == 0) {
+      if (verbose)
+        printf("%s %d had a baby! ", creature->species, creature->id);
+      newCreature(world, nextGenBoard, nextGenCell->row, nextGenCell->col,
+                  type);
+    }
+>>>>>>> 9c6f503d29dc57e599c498932f272859c48817da
   }
 }
 
